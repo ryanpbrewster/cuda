@@ -1,0 +1,9 @@
+JOBNAME   pa
+JOBTYPE   ENER   ! ENER
+THEORY    MONTE  ! monte
+CHARGE    0
+SPHERICAL .false. ! spherical basis set 
+MC_TRIAL  1000000
+MC_NUM    8
+MC_DELX   0.1
+MC_BAND   .false.  ! Quasiparticle energy
