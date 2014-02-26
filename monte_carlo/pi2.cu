@@ -12,7 +12,7 @@
 __global__ void pi(double* d_out, curandState_t* states, int trials) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    curand_init(blockIdx.x, threadIdx.x, 0, &states[idx]);
+    curand_init(idx, idx, 0, &states[idx]);
 
     int count = 0;
     for(int i=0; i < trials; i++) {
