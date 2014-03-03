@@ -13,8 +13,6 @@ module qc_basis
      integer :: nprim
      integer :: ncgs 
      integer :: nsgs 
-     !integer,  dimension(:),   allocatable :: csh   ! cartesian shell info
-     !integer,  dimension(:),   allocatable :: ssh   ! spherical shell info
      real(dp), dimension(:),   allocatable :: alpha !
      real(dp), dimension(:,:), allocatable :: norm  !coef
   end type qc_shl_typ
@@ -40,44 +38,40 @@ contains
 
     lread = .false.
     lok   = .false.
-    if (.TRUE.) then
-       inquire (file='basis.dat', exist=lok)
-       
-       if (lok) then
+    inquire (file='basis.dat', exist=lok)
 
-          open(unit=15, file='basis.dat', status='old')
-          
-          lread = .true.
-          ! Gaussian94 format
-          ! S, SP, P, D
-          ncgs = 0
-          nsgs = 0
-          npgs = 0
-          nshl = 0
-          do ia = 1, natom
-             rewind (15)
-             do 
-                read (15, '(A2,I5)', iostat=eof) atname, nshell
-                if (eof /= 0) then
-                   lread = .false.
-                end if
-                znum = atomic_number_get (atname)
-                if (znum == atom_znum(ia)) then
-                   call basis_read1 (nshell, ncgs0, nsgs0, npgs0)
-                   nshl = nshl + nshell
-                   ncgs = ncgs + ncgs0
-                   nsgs = nsgs + nsgs0
-                   npgs = npgs + npgs0
-                   exit
-                end if
-             end do
-          end do
-       end if
-    end if
-    
     if (.not. lok) then
        call qc_abort ('QC_BASIS_READ: FAIL TO OPEN [basis.dat]')
     end if
+
+    open(unit=15, file='basis.dat', status='old')
+
+    lread = .true.
+    ! Gaussian94 format
+    ! S, SP, P, D
+    ncgs = 0
+    nsgs = 0
+    npgs = 0
+    nshl = 0
+    do ia = 1, natom
+       rewind (15)
+       do 
+          read (15, '(A2,I5)', iostat=eof) atname, nshell
+          if (eof /= 0) then
+             lread = .false.
+          end if
+          znum = atomic_number_get (atname)
+          if (znum == atom_znum(ia)) then
+             call basis_read1 (nshell, ncgs0, nsgs0, npgs0)
+             nshl = nshl + nshell
+             ncgs = ncgs + ncgs0
+             nsgs = nsgs + nsgs0
+             npgs = npgs + npgs0
+             exit
+          end if
+       end do
+    end do
+
     if (.not. lread) then
        call qc_abort ('QC_BASIS_READ: FAIL TO READ [basis.dat]')
     end if
@@ -95,55 +89,53 @@ contains
        
     do ia = 1, natom
        !--- MPI : READ
-       if (.TRUE.) then
-          rewind (15)
+       rewind (15)
        
-          do 
-             read (15, '(A2,I5)', iostat=eof) atname, nshell
-             if (eof /= 0) then
-                stop
-             end if
+       do 
+          read (15, '(A2,I5)', iostat=eof) atname, nshell
+          if (eof /= 0) then
+             stop
+          end if
 
-             znum = atomic_number_get (atname)
-             if (znum == atom_znum(ia)) then
-                am = 0
-                nprim = 0
-                alpha = 0.0_dp
-                coef  = 0.0_dp
-                coef2 = 0.0_dp
+          znum = atomic_number_get (atname)
+          if (znum == atom_znum(ia)) then
+             am = 0
+             nprim = 0
+             alpha = 0.0_dp
+             coef  = 0.0_dp
+             coef2 = 0.0_dp
 
-                do is = 1, nshell
-                   read (15, *) sym, nprim(is)
-                   if (sym == 'SP') then
-                      am(is) = -1
-                   else if (sym == 'S ') then
-                      am(is) = 0
-                   else if (sym == 'P ') then
-                      am(is) = 1
-                   else if (sym == 'D ') then
-                      am(is) = 2
-                   else if (sym == 'F ') then
-                      am(is) = 3
-                   else if (sym == 'G ') then
-                      am(is) = 4
-                   end if
-                   
-                   if (am(is) .eq. -1) then
-                      do ip = 1, nprim(is)
-                         read (15, *) alpha(ip,is), coef(ip,is), coef2(ip,is)
-                      end do
-                   else
-                      do ip = 1, nprim(is)
-                         read (15, *) alpha(ip,is), coef(ip,is)
-                      end do
-                   end if
+             do is = 1, nshell
+                read (15, *) sym, nprim(is)
+                if (sym == 'SP') then
+                   am(is) = -1
+                else if (sym == 'S ') then
+                   am(is) = 0
+                else if (sym == 'P ') then
+                   am(is) = 1
+                else if (sym == 'D ') then
+                   am(is) = 2
+                else if (sym == 'F ') then
+                   am(is) = 3
+                else if (sym == 'G ') then
+                   am(is) = 4
+                end if
 
-                end do
+                if (am(is) .eq. -1) then
+                   do ip = 1, nprim(is)
+                      read (15, *) alpha(ip,is), coef(ip,is), coef2(ip,is)
+                   end do
+                else
+                   do ip = 1, nprim(is)
+                      read (15, *) alpha(ip,is), coef(ip,is)
+                   end do
+                end if
 
-                exit
-             end if
-          end do
-       end if
+             end do
+
+             exit
+          end if
+       end do
 
        call basis_read2 (ia, nshell, nshl, ncgs, nsgs, &
             nprim, am, alpha, coef, coef2)
