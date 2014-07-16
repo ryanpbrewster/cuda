@@ -1,0 +1,12 @@
+Use 128 or 256 threads/block:
+    512 does not work
+    Less than 128 is inefficient
+
+Use ~128 blocks:
+    You want to max out the compute cores. It's unclear to me how they're allocated.
+    (128,128) seems like a nice sweet spot, but (1024,128) and (1024,256) are also effective
+
+Use local variables (especially curandState_t) IF that piece is likely to be a bottleneck:
+    For computing Pi, generating the random numbers is actually the bottleneck,
+        since the computations are so simple. For MCMP2 I imagine that the computations
+        are the real bottleneck. Maybe try taking the CGBF info local.

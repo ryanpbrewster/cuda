@@ -21,16 +21,19 @@ __global__ void initThreads(float* d_out, curandState_t* states) {
 
 __global__ void pi(float* d_out, curandState_t* states, int N_TRIALS) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    curandState_t tmp_state = states[idx];
 
     int count = 0;
     for(int i=1; i <= N_TRIALS; i++) {
-        float x = curand_uniform(&states[idx]);
-        float y = curand_uniform(&states[idx]);
+        float x = curand_uniform(&tmp_state);
+        float y = curand_uniform(&tmp_state);
         if( x*x + y*y <= 1.0f ) {
             count++;
         }
     }
 
+    states[idx] = tmp_state;
     d_out[idx] += float(count)/float(N_TRIALS);
 }
 
@@ -86,6 +89,8 @@ int main(int argc, char** argv) {
     int64_t iters = int64_t(N_KERNELS)*int64_t(N_TRIALS)*int64_t(N_RUNS);
     int elapsed = 1000*(end-start)/CLOCKS_PER_SEC;
 
+    cout << 4*avg << "\n";
+    cout << elapsed << "\n";
     cout << float(iters)/float(elapsed) << " iters/ms\n";
 
     free(h_pis);
