@@ -1,8 +1,9 @@
 // metropolis1.cu
 /*
  * A simple CUDA-enabled program that approximates Pi by evaluating
- *     Integrate[ 4*x^2*y^2*Exp[-(x^2+y^2)], {x,-inf,inf}, {y,-inf,inf} ] == Pi
- * using Metropolis Monte Carlo, with the weight function Exp[-(x^2+y^2)]
+ *     Integrate[ Sqrt[1-x^2], {x,-1,1} ]
+ * using Metropolis Monte Carlo, with the weight function A*(1-x^2)
+ * where A is a normalization factor
  */
 
 #include <iostream>
@@ -24,58 +25,53 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 }
 
 
-__device__ float weightFunction(float x, float y) {
-    const float k = 0.2;
-    const float norm = M_PI/k;
-    return exp(-k*(x*x+y*y)) / norm;
+__device__ double weightFunction(double x) {
+    return 0.75*(1-x*x);
 }
-__device__ float f(float x, float y) {
-    return 4*x*x*y*y*exp(-(x*x+y*y));
+__device__ double f(double x) {
+    return sqrt(1-x*x);
 }
 
 
 
 
 
-__global__ void initThreads(float* d_out, curandState_t* states, float* xs, float* ys, float* radii) {
+__global__ void initThreads(double* d_out, curandState_t* states, double* xs, double* radii) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     curand_init(idx, idx, 0, &states[idx]);
     d_out[idx] = 0.0;
     xs[idx] = 0.0;
-    ys[idx] = 0.0;
     radii[idx] = 1.0;
 }
 
 
-__global__ void pi(float* d_out, curandState_t* states, float* xs, float* ys, float* radii, int N_TRIALS) {
+__global__ void pi(double* d_out, curandState_t* states, double* xs, double* radii, int N_TRIALS) {
     const int ITERS_PER_RADIUS_ADJ = 100;
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     curandState_t tmp_state = states[idx];
-    float x = xs[idx];
-    float y = ys[idx];
-    float r = radii[idx];
+    double x = xs[idx];
+    double r = radii[idx];
 
     int accept = 0, reject = 0;
-    float estimate = 0.0;
-    float cur_weight = weightFunction(x,y);
+    double estimate = 0.0;
+    double cur_weight = weightFunction(x);
     for(int i=1; i <= N_TRIALS; i++) {
-        float xp = x + r*(2*curand_uniform(&tmp_state)-1);
-        float yp = x + r*(2*curand_uniform(&tmp_state)-1);
-        float new_weight = weightFunction(xp, yp);
-        if( curand_uniform(&tmp_state) < new_weight/cur_weight ) {
+        double xp = x + r*(2*curand_uniform_double(&tmp_state)-1);
+        double new_weight = weightFunction(xp);
+        double xi = curand_uniform_double(&tmp_state);
+        if( xi < new_weight/cur_weight ) {
             x = xp;
-            y = yp;
             cur_weight = new_weight;
             accept++;
         } else {
             reject++;
         }
-        estimate += f(x,y) / cur_weight;
+        estimate += f(x) / cur_weight;
 
         if( i%ITERS_PER_RADIUS_ADJ == 0 ) {
-            float accept_ratio = float(accept) / float(accept + reject);
-            float adj = min(max(2.0*accept_ratio, 0.9), 1.1);
+            double accept_ratio = double(accept) / double(accept + reject);
+            double adj = min(max(2.0*accept_ratio, 0.9), 1.1);
             r *= adj;
             accept = 0; reject = 0;
         }
@@ -83,7 +79,6 @@ __global__ void pi(float* d_out, curandState_t* states, float* xs, float* ys, fl
 
     states[idx] = tmp_state;
     xs[idx] = x;
-    ys[idx] = y;
     radii[idx] = r;
     d_out[idx] += estimate / N_TRIALS;
 }
@@ -117,30 +112,27 @@ int main(int argc, char** argv) {
 
     int N_KERNELS = GRID_SIZE * BLOCK_SIZE;
 
-    float* h_pis = (float*) malloc(N_KERNELS*sizeof(float));
-    float* d_pis;
-    gpuErrchk(cudaMalloc(&d_pis, N_KERNELS * sizeof(float)));
+    double* h_pis = (double*) malloc(N_KERNELS*sizeof(double));
+    double* d_pis;
+    gpuErrchk(cudaMalloc(&d_pis, N_KERNELS * sizeof(double)));
 
     curandState_t* states;
     gpuErrchk(cudaMalloc(&states, N_KERNELS * sizeof(curandState_t)));
 
-    float* xs;
-    gpuErrchk(cudaMalloc(&xs, N_KERNELS * sizeof(float)));
+    double* xs;
+    gpuErrchk(cudaMalloc(&xs, N_KERNELS * sizeof(double)));
 
-    float* ys;
-    gpuErrchk(cudaMalloc(&ys, N_KERNELS * sizeof(float)));
-
-    float* radii;
-    gpuErrchk(cudaMalloc(&radii, N_KERNELS * sizeof(float)));
+    double* radii;
+    gpuErrchk(cudaMalloc(&radii, N_KERNELS * sizeof(double)));
 
     time_t start = clock();
 
-    initThreads<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, ys, radii);
+    initThreads<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, radii);
     for(int irun=1; irun <= N_RUNS; irun++) {
-        pi<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, ys, radii, N_TRIALS);
+        pi<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, radii, N_TRIALS);
     }
-    gpuErrchk(cudaMemcpy(h_pis, d_pis, N_KERNELS*sizeof(float), cudaMemcpyDeviceToHost));
-    float avg = 0.0;
+    gpuErrchk(cudaMemcpy(h_pis, d_pis, N_KERNELS*sizeof(double), cudaMemcpyDeviceToHost));
+    double avg = 0.0;
     for(int i=0; i < N_KERNELS; i++) {
         avg += h_pis[i] / N_RUNS;
     }
@@ -151,14 +143,14 @@ int main(int argc, char** argv) {
     int64_t iters = int64_t(N_KERNELS)*int64_t(N_TRIALS)*int64_t(N_RUNS);
     int elapsed = 1000*(end-start)/CLOCKS_PER_SEC;
 
-    cout << "pi = " << avg << "\n";
+    cout.precision(10);
+    cout << "pi = " << 2*avg << "\n";
     cout << elapsed << " ms" << "\n";
-    cout << float(iters)/float(elapsed) << " iters/ms\n";
+    cout << double(iters)/double(elapsed) << " iters/ms\n";
 
     free(h_pis);
     cudaFree(d_pis);
     cudaFree(states);
     cudaFree(xs);
-    cudaFree(ys);
     return 0;
 }
