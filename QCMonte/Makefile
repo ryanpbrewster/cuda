@@ -10,7 +10,6 @@ SRC = qc_kind.f90 \
       qc_psi.f90 \
       qc_mcmp2.f90 \
       qc_monte.f90 \
-      foo.cpp \
       main.f90 
 
 

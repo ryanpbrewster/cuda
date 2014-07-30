@@ -15,10 +15,10 @@ program qc_main
 
   call nw_vectors_read
 
-  call foo
+  call qc_basis_print
 
   call qc_input_mem_free
- 
+
   call qc_end
 
   print *, 'Done executing'

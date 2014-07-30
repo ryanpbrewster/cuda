@@ -15,31 +15,29 @@ contains
     character(len=2) :: atname
     real(dp) :: xi, yi, zi
     real(dp), dimension(:), allocatable :: pos_local
-    
-    if (.TRUE.) then
-       open (unit=15, file='geom.xyz', status='old')
-       read (15, *) natom
-       read (15, *)
-    end if
+
+    open (unit=15, file='geom.xyz', status='old')
+    read (15, *) natom
+    print *, 'Atoms: ', natom
+
+    read (15, *)
 
     call qc_geom_mem_init
 
     allocate (pos_local(natom*3))
 
-    if (.TRUE.) then
-       j = 0
-       do i = 1, natom
-          read (15, *) atname, xi, yi, zi
-          j = j + 1 
-          pos_local(j) = xi*ang_to_bohr
-          j = j + 1 
-          pos_local(j) = yi*ang_to_bohr
-          j = j + 1 
-          pos_local(j) = zi*ang_to_bohr
-          atom_znum(i) = atomic_number_get (atname)
-       end do
-       close (15)
-    end if
+    j = 0
+    do i = 1, natom
+       read (15, *) atname, xi, yi, zi
+       j = j + 1 
+       pos_local(j) = xi*ang_to_bohr
+       j = j + 1 
+       pos_local(j) = yi*ang_to_bohr
+       j = j + 1 
+       pos_local(j) = zi*ang_to_bohr
+       atom_znum(i) = atomic_number_get (atname)
+    end do
+    close (15)
 
     j = 0
     do i = 1, natom
@@ -49,6 +47,7 @@ contains
        atom_pos(2,i) = pos_local(j)
        j = j+1
        atom_pos(3,i) = pos_local(j)
+       print *, 'Atom #', i, ': ', atom_znum(i), ' at (', atom_pos(1,i), ',', atom_pos(2,i), ',', atom_pos(3,i), ')'
     end do
 
     deallocate (pos_local)

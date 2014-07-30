@@ -271,7 +271,7 @@ contains
 
           ncgs = ncgs + 1
           nsgs = nsgs + 1
-          
+
           !--- normalize basis functions
 
           facs = 0.0_dp
@@ -281,7 +281,7 @@ contains
                 fac = aa * sqrt(aa)
                 dum = ishl%norm(1,ip)*ishl%norm(1,jp)/fac
                 if (ip .ne. jp) dum = dum + dum
-                
+
                 facs = facs + dum
              end do
           end do
