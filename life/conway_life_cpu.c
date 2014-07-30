@@ -1,18 +1,8 @@
 #include <ncurses.h>
-#include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-using namespace std;
-
-const uint8_t DEAD  = 0;
-const uint8_t ALIVE = 1;
-
-typedef struct {
-    uint8_t * board;
-    uint8_t * work;
-    size_t R, C;
-} GameBoard;
+#include "conway_life_cpu.h"
 
 GameBoard * newGameBoard(size_t R, size_t C) {
     GameBoard * g = (GameBoard *) malloc(sizeof(GameBoard));
@@ -78,9 +68,9 @@ void displayBoard(GameBoard * g) {
 void printBoard(GameBoard * g) {
     for(int i=0; i < g->R; i++) {
         for(int j=0; j < g->C; j++) {
-            cout << cellCharacter(g->board[g->C*i+j]);
+            printf("%c", cellCharacter(g->board[g->C*i+j]));
         }
-        cout << "\n";
+        printf("\n");
     }
 }
 
