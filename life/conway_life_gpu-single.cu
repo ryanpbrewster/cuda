@@ -7,7 +7,7 @@
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        fprintf(stderr,"GPUassert: \"%s\" in %s at %d\n", cudaGetErrorString(code), file, line);
         if (abort) {
             exit(code);
         }
@@ -59,19 +59,12 @@ __global__ void updateCell(uint8_t * next, uint8_t * cur, size_t R, size_t C) {
     }
 }
 
-void updateBoard(GameBoard * g) {
+void updateBoard(GameBoard * g, uint8_t * d_board, uint8_t * d_work) {
     size_t const bytes = g->R * g->C * sizeof(uint8_t);
-    uint8_t * d_board;
-    uint8_t * d_work;
-    gpuErrchk( cudaMalloc(&d_board, bytes) );
-    gpuErrchk( cudaMalloc(&d_work,  bytes) );
+    //printf("About to copy %d bytes into d_board\n", bytes);
     gpuErrchk( cudaMemcpy(d_board, g->board, bytes, cudaMemcpyHostToDevice) );
-
     updateCell<<<dim3(16,16,1), dim3(16,16,1)>>>(d_work, d_board, g->R, g->C);
-
     gpuErrchk( cudaMemcpy(g->board, d_work, bytes, cudaMemcpyDeviceToHost) );
-    gpuErrchk( cudaFree(d_board) );
-    gpuErrchk( cudaFree(d_work) );
 }
 
 void displayBoard(GameBoard * g) {
@@ -93,6 +86,12 @@ void printBoard(GameBoard * g) {
 
 
 void runGame(GameBoard * g) {
+    uint8_t * d_board;
+    uint8_t * d_work;
+    size_t const bytes = g->R * g->C * sizeof(uint8_t);
+    gpuErrchk( cudaMalloc(&d_board, bytes) );
+    gpuErrchk( cudaMalloc(&d_work,  bytes) );
+
     displayBoard(g);
     refresh();
 
@@ -100,8 +99,10 @@ void runGame(GameBoard * g) {
     while(true) {
         char ch = getch();
         switch(ch) {
-            case 'q': return;
-            default:  updateBoard(g); break;
+            case 'q': cudaFree(d_board);
+                      cudaFree(d_work);
+                      return;
+            default:  updateBoard(g, d_board, d_work); break;
         }
         clear();
         displayBoard(g);
