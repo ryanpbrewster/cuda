@@ -1,4 +1,3 @@
-#include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +13,12 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true) {
     }
 }
 
+void freeGameBoard(GameBoard * g) {
+    free(g->board);
+    free(g->work);
+    free(g);
+}
+
 GameBoard * newGameBoard(size_t R, size_t C) {
     GameBoard * g = (GameBoard *) malloc(sizeof(GameBoard));
     g->R = R;
@@ -24,8 +29,6 @@ GameBoard * newGameBoard(size_t R, size_t C) {
     memset(g->board, DEAD, BOARD_BYTES);
     return g;
 }
-
-void printBoard(GameBoard * g);
 
 __device__ uint8_t newStatus(uint8_t status, int count) {
     if( status == ALIVE ) {
@@ -61,20 +64,11 @@ __global__ void updateCell(uint8_t * next, uint8_t * cur, size_t R, size_t C) {
 
 void updateBoard(GameBoard * g, uint8_t * d_board, uint8_t * d_work) {
     size_t const bytes = g->R * g->C * sizeof(uint8_t);
-    //printf("About to copy %d bytes into d_board\n", bytes);
     gpuErrchk( cudaMemcpy(d_board, g->board, bytes, cudaMemcpyHostToDevice) );
     updateCell<<<dim3(16,16,1), dim3(16,16,1)>>>(d_work, d_board, g->R, g->C);
     gpuErrchk( cudaMemcpy(g->board, d_work, bytes, cudaMemcpyDeviceToHost) );
 }
 
-void displayBoard(GameBoard * g) {
-    for(int i=0; i < g->R; i++) {
-        for(int j=0; j < g->C; j++) {
-            addch(cellCharacter(g->board[g->C*i+j]));
-        }
-        addch('\n');
-    }
-}
 void printBoard(GameBoard * g) {
     for(int i=0; i < g->R; i++) {
         for(int j=0; j < g->C; j++) {
@@ -84,54 +78,37 @@ void printBoard(GameBoard * g) {
     }
 }
 
+int main(int argc, char** argv) {
+    if( argc != 2 ) {
+        fprintf(stderr, "Usage: %s [# of generations to simulate]\n", argv[0]);
+        return 1;
+    }
+    int t = atoi(argv[1]);
 
-void runGame(GameBoard * g) {
+    GameBoard * g = newGameBoard(15, 60);
+
+    // Create the R-pentomino somewhere near the center of the board
+    int mi = g->R/2;
+    int mj = g->C/2;
+    g->board[g->C*(mi+0)+(mj+1)] = ALIVE;
+    g->board[g->C*(mi+0)+(mj+2)] = ALIVE;
+    g->board[g->C*(mi+1)+(mj+0)] = ALIVE;
+    g->board[g->C*(mi+1)+(mj+1)] = ALIVE;
+    g->board[g->C*(mi+2)+(mj+1)] = ALIVE;
+
     uint8_t * d_board;
     uint8_t * d_work;
     size_t const bytes = g->R * g->C * sizeof(uint8_t);
     gpuErrchk( cudaMalloc(&d_board, bytes) );
     gpuErrchk( cudaMalloc(&d_work,  bytes) );
 
-    displayBoard(g);
-    refresh();
-
-    timeout(100);
-    while(true) {
-        char ch = getch();
-        switch(ch) {
-            case 'q': cudaFree(d_board);
-                      cudaFree(d_work);
-                      return;
-            default:  updateBoard(g, d_board, d_work); break;
-        }
-        clear();
-        displayBoard(g);
-        refresh();
+    for(int i=1; i <= t; i++) {
+        updateBoard(g, d_board, d_work);
     }
-}
+    printBoard(g);
 
-int main() {
-    initscr();
-    cbreak();
-    noecho();
-
-    GameBoard * g = newGameBoard(15, 60);
-
-    // Create the R-pentomino somewhere near the center of the board
-    int i = g->R/2;
-    int j = g->C/2;
-    g->board[g->C*(i+0)+(j+1)] = ALIVE;
-    g->board[g->C*(i+0)+(j+2)] = ALIVE;
-    g->board[g->C*(i+1)+(j+0)] = ALIVE;
-    g->board[g->C*(i+1)+(j+1)] = ALIVE;
-    g->board[g->C*(i+2)+(j+1)] = ALIVE;
-
-    runGame(g);
-
-    endwin();
-
-    free(g->board);
-    free(g->work);
-    free(g);
+    gpuErrchk( cudaFree(d_board) );
+    gpuErrchk( cudaFree(d_work) );
+    freeGameBoard(g);
     return 0;
 }
