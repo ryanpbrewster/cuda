@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "conway_life_cpu.h"
+#include <time.h>
+#include "conway_life.hpp"
 
 GameBoard * newGameBoard(size_t R, size_t C) {
     GameBoard * g = (GameBoard *) malloc(sizeof(GameBoard));
@@ -20,44 +21,9 @@ void freeGameBoard(GameBoard * g) {
     free(g);
 }
 
-uint8_t newStatus(uint8_t status, int count) {
-    if( status == ALIVE ) {
-        return (count < 2 || count > 3)? DEAD : ALIVE;
-    } else {
-        return (count == 3)? ALIVE : DEAD;
-    }
-}
 
 char cellCharacter(uint8_t status) {
     return (status == ALIVE)? '#' : '.';
-}
-
-void updateCell(uint8_t * next, uint8_t * cur, int i, int j, size_t R, size_t C) {
-    // neighbors of (i,j)
-    int ns[] = { C*((i-1+R)%R)  + ((j-1+C)%C)
-               , C*((i-1+R)%R)  + ((j  +C)%C)
-               , C*((i-1+R)%R)  + ((j+1+C)%C)
-               , C*((i  +R)%R)  + ((j-1+C)%C)
-               , C*((i  +R)%R)  + ((j+1+C)%C)
-               , C*((i+1+R)%R)  + ((j-1+C)%C)
-               , C*((i+1+R)%R)  + ((j  +C)%C)
-               , C*((i+1+R)%R)  + ((j+1+C)%C)
-               };
-    int idx = C*i + j;
-    int count = cur[ns[0]] + cur[ns[1]] + cur[ns[2]] + cur[ns[3]] + cur[ns[4]] + cur[ns[5]] + cur[ns[6]] + cur[ns[7]];
-    next[idx] = newStatus(cur[idx], count);
-}
-
-void updateBoard(GameBoard * g) {
-    for(int i=0; i < g->R; i++) {
-        for(int j=0; j < g->C; j++) {
-            updateCell(g->work, g->board, i, j, g->R, g->C);
-        }
-    }
-
-    uint8_t * tmp = g->board;
-    g->board = g->work;
-    g->work = tmp;
 }
 
 void printBoard(GameBoard * g) {
@@ -88,10 +54,13 @@ int main(int argc, char** argv) {
     g->board[g->C*(i+1)+(j+1)] = ALIVE;
     g->board[g->C*(i+2)+(j+1)] = ALIVE;
 
-    for(int i=1; i <= t; i++) {
-        updateBoard(g);
-    }
+    time_t start = clock();
+    updateBoard(g, t);
+    time_t end = clock();
+    int elapsed = 1000*(end-start)/CLOCKS_PER_SEC;
+
     printBoard(g);
+    printf("Took %d ms\n", elapsed);
 
     freeGameBoard(g);
     return 0;
