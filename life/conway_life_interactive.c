@@ -1,3 +1,4 @@
+#include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,11 +15,7 @@ GameBoard * newGameBoard(size_t R, size_t C) {
     return g;
 }
 
-void freeGameBoard(GameBoard * g) {
-    free(g->board);
-    free(g->work);
-    free(g);
-}
+void printBoard(GameBoard * g);
 
 uint8_t newStatus(uint8_t status, int count) {
     if( status == ALIVE ) {
@@ -60,6 +57,14 @@ void updateBoard(GameBoard * g) {
     g->work = tmp;
 }
 
+void displayBoard(GameBoard * g) {
+    for(int i=0; i < g->R; i++) {
+        for(int j=0; j < g->C; j++) {
+            addch(cellCharacter(g->board[g->C*i+j]));
+        }
+        addch('\n');
+    }
+}
 void printBoard(GameBoard * g) {
     for(int i=0; i < g->R; i++) {
         for(int j=0; j < g->C; j++) {
@@ -70,13 +75,26 @@ void printBoard(GameBoard * g) {
 }
 
 
-int main(int argc, char** argv) {
-    if( argc != 2 ) {
-        fprintf(stderr, "Usage: %s [# of generations to simulate]\n", argv[0]);
-        return 1;
+void runGame(GameBoard * g) {
+    displayBoard(g);
+    refresh();
+    while(true) {
+        char ch = getch();
+        switch(ch) {
+            case 'q': return;
+            default:  updateBoard(g); break;
+        }
+        clear();
+        displayBoard(g);
+        refresh();
     }
+}
 
-    int t = atoi(argv[1]);
+int main() {
+    initscr();
+    cbreak();
+    noecho();
+
     GameBoard * g = newGameBoard(15, 60);
 
     // Create the R-pentomino somewhere near the center of the board
@@ -88,11 +106,12 @@ int main(int argc, char** argv) {
     g->board[g->C*(i+1)+(j+1)] = ALIVE;
     g->board[g->C*(i+2)+(j+1)] = ALIVE;
 
-    for(int i=1; i <= t; i++) {
-        updateBoard(g);
-    }
-    printBoard(g);
+    runGame(g);
 
-    freeGameBoard(g);
+    endwin();
+
+    free(g->board);
+    free(g->work);
+    free(g);
     return 0;
 }
