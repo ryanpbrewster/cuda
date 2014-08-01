@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
     }
 
     int t = atoi(argv[1]);
-    GameBoard * g = newGameBoard(15, 60);
+    GameBoard * g = newGameBoard(42, 174);
 
     // Create the R-pentomino somewhere near the center of the board
     int i = g->R/2;
