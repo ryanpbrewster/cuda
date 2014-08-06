@@ -7,11 +7,10 @@
  */
 
 #include <iostream>
-#include <curand.h>
-#include <curand_kernel.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <mpi.h>
 #include "metropolis.hpp"
 using namespace std;
 
@@ -43,17 +42,21 @@ int main(int argc, char** argv) {
     printf("G=% 4d, B=% 4d, T=% 8d, R=% 5d\n", GRID_SIZE, BLOCK_SIZE, N_TRIALS, N_RUNS);
 
     MPI_Init(NULL, NULL);
-    int NPROC;
-    MPI_Comm_size(MPI_COMM_WORLD, &NPROC);
+    int N_PROC;
+    MPI_Comm_size(MPI_COMM_WORLD, &N_PROC);
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    double local_pi = mcpi(GRID_SIZE, BLOCK_SIZE, N_TRIALS, N_RUNS, GRID_SIZE*BLOCK_SIZE*rank);
+    double local_pi = pi(GRID_SIZE, BLOCK_SIZE, N_TRIALS, N_RUNS, GRID_SIZE*BLOCK_SIZE*rank);
     double global_pi;
     MPI_Reduce(&local_pi, &global_pi, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
+    if( rank == 0 ) {
+        global_pi /= N_PROC;
+        printf("%f\n", global_pi);
+    }
+
     MPI_Finalize();
 
-    printf("%f\n", global_pi);
 }

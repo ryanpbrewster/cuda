@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+#include "metropolis.hpp"
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 {
@@ -82,7 +84,7 @@ __global__ void mcpi(double* d_out, curandState_t* states, double* xs, double* r
     d_out[idx] += estimate / N_TRIALS;
 }
 
-double pi(int const GRID_SIZE, int const BLOCK_SIZE, int const N_THREADS, int const N_RUNS, int seed) {
+double pi(int const GRID_SIZE, int const BLOCK_SIZE, int const N_TRIALS, int const N_RUNS, int seed) {
     int N_KERNELS = GRID_SIZE * BLOCK_SIZE;
 
     double* h_pis = (double*) malloc(N_KERNELS*sizeof(double));
@@ -100,7 +102,7 @@ double pi(int const GRID_SIZE, int const BLOCK_SIZE, int const N_THREADS, int co
 
     initThreads<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, radii, seed);
     for(int irun=1; irun <= N_RUNS; irun++) {
-        pi<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, radii, N_TRIALS);
+        mcpi<<<GRID_SIZE, BLOCK_SIZE>>>(d_pis, states, xs, radii, N_TRIALS);
     }
     gpuErrchk(cudaMemcpy(h_pis, d_pis, N_KERNELS*sizeof(double), cudaMemcpyDeviceToHost));
 
